@@ -5,7 +5,8 @@ package("libsdl3")
     set_license("zlib")
 
     add_urls("https://github.com/libsdl-org/SDL.git")
-    add_versions("20240204", "5b8e5f8b9f059fb0ade789c13df4caeb1db0a5c2")
+    add_versions("3.1.6", "preview-3.1.6")
+    add_versions("3.1.3", "preview-3.1.3")
 
     add_deps("cmake")
 
