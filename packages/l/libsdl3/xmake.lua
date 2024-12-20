@@ -14,12 +14,6 @@ package("libsdl3")
 
     add_includedirs("include", "include/SDL3")
 
-    if is_plat("android") then
-        add_configs("sdlmain", {description = "Use SDL_main entry point", default = false, type = "boolean", readonly = true})
-    else
-        add_configs("sdlmain", {description = "Use SDL_main entry point", default = true, type = "boolean"})
-    end
-
     if is_plat("linux", "bsd") then
         add_configs("x11", {description = "Enables X11 support (requires it on the system)", default = true, type = "boolean"})
         add_configs("wayland", {description = "Enables Wayland support", default = true, type = "boolean"})
