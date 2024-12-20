@@ -1,53 +1,45 @@
 package("libsdl3")
     set_homepage("https://www.libsdl.org/")
     set_description("Simple DirectMedia Layer")
-
     set_license("zlib")
 
-    add_urls("https://github.com/libsdl-org/SDL.git")
-    add_versions("3.1.6", "preview-3.1.6")
-    add_versions("3.1.3", "preview-3.1.3")
+    add_urls("https://www.libsdl.org/release/SDL3-$(version).zip",
+             "https://github.com/libsdl-org/SDL/releases/download/release-$(version)/SDL3-$(version).zip", { alias = "archive" })
+    add_urls("https://github.com/libsdl-org/SDL.git", { alias = "github" })
+
+    add_versions("github:3.1.6", "preview-3.1.6")
+    add_versions("github:3.1.3", "preview-3.1.3")
 
     add_deps("cmake")
 
-    add_includedirs("include")
+    add_includedirs("include", "include/SDL3")
 
-    if is_plat("linux") then
-        add_configs("x11", {description = "Enables X11 support (requires it on the system)", default = true, type = "boolean"})
+    if is_plat("android") then
+        add_configs("sdlmain", {description = "Use SDL_main entry point", default = false, type = "boolean", readonly = true})
+    else
+        add_configs("sdlmain", {description = "Use SDL_main entry point", default = true, type = "boolean"})
     end
 
-    add_configs("use_angle", {default = false, type = "boolean"})
+    if is_plat("linux", "bsd") then
+        add_configs("x11", {description = "Enables X11 support (requires it on the system)", default = true, type = "boolean"})
+        add_configs("wayland", {description = "Enables Wayland support", default = true, type = "boolean"})
+
+        -- @note deprecated
+        add_configs("with_x", {description = "Enables X support (requires it on the system)", default = true, type = "boolean"})
+    end
+
+    if is_plat("wasm") then
+        add_cxflags("-sUSE_SDL=0")
+    end
 
     on_load(function (package)
-        if package:config("sdlmain") then
-            package:add("components", "main")
-            if package:is_plat("mingw") then
-                -- MinGW requires linking mingw32 before SDL3main
-                local libsuffix = package:is_debug() and "d" or ""
-                package:add("linkorders", "mingw32", "SDL3main" .. libsuffix)
-            end
-        else
-            package:add("defines", "SDL_MAIN_HANDLED")
-        end
         package:add("components", "lib")
-        if package:is_plat("linux") and (package:config("x11")) then
+        if package:is_plat("linux", "bsd") and (package:config("x11") or package:config("with_x")) then
             package:add("deps", "libxext", {private = true})
         end
-
-        if package:config("use_angle") then
-          package:add("deps", "angle")
+        if package:is_plat("linux", "bsd") and package:config("wayland") then
+            package:add("deps", "wayland", {private = true})
         end
-    end)
-
-    on_component("main", function (package, component)
-        local libsuffix = package:is_debug() and "d" or ""
-        component:add("links", "SDL3main" .. libsuffix)
-        if package:is_plat("windows") then
-            component:add("syslinks", "shell32")
-        elseif package:is_plat("mingw") then
-            component:add("syslinks", "mingw32")
-        end
-        component:add("deps", "lib")
     end)
 
     on_component("lib", function (package, component)
@@ -78,7 +70,7 @@ package("libsdl3")
                 end
             end
         end
-            end)
+    end)
 
     on_fetch("linux", "macosx", "bsd", function (package, opt)
         if opt.system then
@@ -129,12 +121,13 @@ package("libsdl3")
     end)
 
     on_install(function (package)
+        io.replace("src/sensor/android/SDL_androidsensor.c", "ALooper_pollAll", "ALooper_pollOnce", {plain = true})
         local configs = {}
         table.insert(configs, "-DCMAKE_BUILD_TYPE=" .. (package:debug() and "Debug" or "Release"))
         table.insert(configs, "-DBUILD_SHARED_LIBS=" .. (package:config("shared") and "ON" or "OFF"))
         table.insert(configs, "-DSDL_TEST=OFF")
         local opt
-        if package:is_plat("linux", "cross") then
+        if package:is_plat("linux", "bsd", "cross") then
             local includedirs = {}
             for _, depname in ipairs({"libxext", "libx11", "xorgproto"}) do
                 local dep = package:dep(depname)
@@ -163,10 +156,6 @@ package("libsdl3")
             opt = opt or {}
             opt.cflags = {"-sUSE_SDL=0"}
         end
-        if package:configs("use_angle") then
-          table.insert(opt.cflags, "-DSDL_VIDEO_STATIC_ANGLE")
-        end
-
         import("package.tools.cmake").install(package, configs, opt)
     end)
 
